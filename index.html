@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>泌尿撞球遊戲</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 1rem;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            color: #3498db;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-align: center;
+            font-size: 2.2rem;
+            margin: 0;
+        }
+
+        .game-container {
+            position: relative;
+            background-color: #16a085;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 9 / 16;
+            margin: 0 auto;
+            border: 15px solid #8B4513;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 10px;
+        }
+
+        .game-status-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .game-status-box {
+            background-color: rgba(44, 62, 80, 0.9);
+            border-radius: 15px;
+            padding: 2rem;
+            max-width: 80%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .game-status-box h2 {
+            margin-top: 0;
+            color: #3498db;
+        }
+        
+        .game-status-box ol {
+            padding-left: 1rem;
+            text-align: left;
+            margin-bottom: 1rem;
+        }
+
+        .game-status-box li {
+            margin-bottom: 0.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .button {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            box-shadow: 0 4px 0 #1f64a5;
+            transition: all 0.1s ease-in-out;
+            user-select: none;
+        }
+
+        .button:active {
+            box-shadow: 0 1px 0 #1f64a5;
+            transform: translateY(3px);
+        }
+        
+        .score-display {
+            font-size: 1.2rem;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        
+        .timer-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #e74c3c; /* Red color */
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 0.25rem 0.75rem;
+            border-radius: 8px;
+        }
+
+        #playerTurnMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        
+        #playerTurnMessage.show {
+            opacity: 1;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                /* Removed flex-direction: column to keep items side-by-side */
+                gap: 0.5rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .game-status-box {
+                font-size: 0.9rem;
+                padding: 1.5rem;
+            }
+            .button {
+                font-size: 0.8rem;
+                padding: 0.5rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>泌尿撞球遊戲</h1>
+        <div class="timer-display" id="timerDisplay"></div>
+    </div>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="game-status-overlay" id="gameStatusOverlay">
+            <div class="game-status-box">
+                <div id="rulesScreen">
+                    <h2>遊戲規則</h2>
+                    <ol>
+                        <li>使用白球（健康因子）來撞擊並依序將「有害因素」球打進球袋。</li>
+                        <li>點擊並拖曳滑鼠或手指來瞄準並調整擊球力道。</li>
+                        <li>注意！如果白球不小心掉進任何一個洞裡，遊戲就會失敗。</li>
+                        <li>如果將非目標的球打進球袋，它將會回到檯面。</li>
+                        <li>當所有有害因素球都被清除，你就勝利了！</li>
+                        <li>你只有 10 分鐘的時間可以完成任務。</li>
+                    </ol>
+                    <div class="controls">
+                        <button id="nextButton" class="button">下一步</button>
+                    </div>
+                </div>
+                <div id="modeScreen" class="hidden">
+                    <h2>選擇遊戲模式</h2>
+                    <div class="controls">
+                        <button id="singlePlayerButton" class="button">單人遊戲</button>
+                        <button id="twoPlayerButton" class="button">雙人遊戲</button>
+                    </div>
+                </div>
+                <div id="endScreen" class="hidden">
+                    <h2 id="endMessage"></h2>
+                    <div class="controls">
+                        <button id="restartButton" class="button">重新開始</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="playerTurnMessage"></div>
+    </div>
+    
+    <div class="controls">
+        <div class="score-display" id="scoreDisplay"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameStatusOverlay = document.getElementById('gameStatusOverlay');
+        const rulesScreen = document.getElementById('rulesScreen');
+        const modeScreen = document.getElementById('modeScreen');
+        const endScreen = document.getElementById('endScreen');
+        const nextButton = document.getElementById('nextButton');
+        const singlePlayerButton = document.getElementById('singlePlayerButton');
+        const twoPlayerButton = document.getElementById('twoPlayerButton');
+        const restartButton = document.getElementById('restartButton');
+        const endMessage = document.getElementById('endMessage');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const playerTurnMessage = document.getElementById('playerTurnMessage');
+        const timerDisplay = document.getElementById('timerDisplay');
+        
+        let balls = [];
+        let cueBall;
+        let gameActive = false;
+        let mouse = { x: 0, y: 0, down: false, initialX: 0, initialY: 0 };
+        let animationFrameId;
+        let targetBallNumber = 1;
+        const totalHarmfulBalls = 10;
+        const ballPositions = [];
+        let isTwoPlayerMode = false;
+        let currentGameMode = 'single';
+        let currentPlayer = 1;
+        let pocketedBallsInTurn = [];
+        let canTakeShot = true;
+        let gameStartTime = 0;
+        const gameDuration = 10 * 60 * 1000; // 10 minutes in milliseconds
+        let timerInterval;
+
+        const BALL_RADIUS = 12;
+        const TABLE_COLOR = '#16a085';
+        const CUSHION_COLOR = '#8B4513';
+        const POCKET_RADIUS = 20;
+        const MAX_POWER = 150;
+        const CUE_LENGTH = 200;
+        const FONT_SIZE = 14;
+        
+        // Use Tone.js for sound effects
+        const ballHitSynth = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: {
+                attack: 0.005,
+                decay: 0.1,
+                sustain: 0,
+                release: 0.1
+            }
+        }).toDestination();
+        
+        const pocketSynth = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: {
+                attack: 0.01,
+                decay: 0.2,
+                sustain: 0,
+                release: 0.3
+            }
+        }).toDestination();
+
+        // Resize canvas to fit container
+        function resizeCanvas() {
+            const container = document.querySelector('.game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = canvas.width * 16 / 9;
+            drawTable();
+            if (gameActive) {
+                drawBalls();
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Ball class
+        class Ball {
+            constructor(x, y, color, type, name = '', number = null) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = BALL_RADIUS;
+                this.color = color;
+                this.type = type;
+                this.name = name;
+                this.number = number;
+                this.active = true;
+            }
+
+            draw() {
+                if (!this.active) return;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                if (this.type === 'harmful') {
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `${FONT_SIZE}px Roboto`;
+                    ctx.fillText(this.number, this.x, this.y - 7);
+                    ctx.font = `${FONT_SIZE - 4}px Roboto`;
+                    ctx.fillText(this.name, this.x, this.y + 7);
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                this.vx *= 0.99;
+                this.vy *= 0.99;
+                if (Math.abs(this.vx) < 0.05) this.vx = 0;
+                if (Math.abs(this.vy) < 0.05) this.vy = 0;
+            }
+
+            isMoving() {
+                return Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1;
+            }
+        }
+
+        // Draw table and pockets
+        function drawTable() {
+            ctx.fillStyle = TABLE_COLOR;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = CUSHION_COLOR;
+            ctx.fillRect(0, 0, 15, canvas.height);
+            ctx.fillRect(canvas.width - 15, 0, 15, canvas.height);
+            ctx.fillRect(0, 0, canvas.width, 15);
+            ctx.fillRect(0, canvas.height - 15, canvas.width, 15);
+
+            const pockets = getPockets();
+            ctx.fillStyle = '#000';
+            pockets.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Get pocket positions
+        function getPockets() {
+            return [
+                { x: 15, y: 15, radius: POCKET_RADIUS },
+                { x: canvas.width - 15, y: 15, radius: POCKET_RADIUS },
+                { x: 15, y: canvas.height / 2, radius: POCKET_RADIUS },
+                { x: canvas.width - 15, y: canvas.height / 2, radius: POCKET_RADIUS },
+                { x: 15, y: canvas.height - 15, radius: POCKET_RADIUS },
+                { x: canvas.width - 15, y: canvas.height - 15, radius: POCKET_RADIUS }
+            ];
+        }
+
+        // Reset and place balls
+        function resetBalls() {
+            balls = [];
+            cueBall = new Ball(canvas.width / 2, canvas.height * 0.8, '#fff', 'cue');
+            balls.push(cueBall);
+            
+            ballPositions.length = 0;
+
+            const harmfulFactors = [
+                { name: '發炎', color: '#e74c3c' },
+                { name: '結石', color: '#3498db' },
+                { name: '感染', color: '#9b59b6' },
+                { name: '高鹽', color: '#f1c40f' },
+                { name: '壓力', color: '#e67e22' },
+                { name: '高血糖', color: '#7f8c8d' },
+                { name: '高血壓', color: '#c0392b' },
+                { name: '抽菸', color: '#27ae60' },
+                { name: '熬夜', color: '#34495e' },
+                { name: '腫瘤', color: '#1abc9c' }
+            ];
+            
+            // Correctly place balls in a pyramid formation
+            let ballIndex = 0;
+            const rows = [1, 2, 3, 4];
+            const startX = canvas.width / 2;
+            const startY = canvas.height * 0.25;
+            const verticalSpacing = BALL_RADIUS * 2 * Math.sqrt(3) / 2;
+            const horizontalSpacing = BALL_RADIUS * 2;
+            
+            for (let i = 0; i < rows.length; i++) {
+                const numBallsInRow = rows[i];
+                const rowY = startY + i * verticalSpacing;
+                const rowStartX = startX - (numBallsInRow - 1) * horizontalSpacing / 2;
+                
+                for (let j = 0; j < numBallsInRow; j++) {
+                    if (ballIndex >= harmfulFactors.length) break;
+                    const factor = harmfulFactors[ballIndex];
+                    const newBall = new Ball(
+                        rowStartX + j * horizontalSpacing,
+                        rowY,
+                        factor.color,
+                        'harmful',
+                        factor.name,
+                        ballIndex + 1
+                    );
+                    balls.push(newBall);
+                    ballPositions.push({x: newBall.x, y: newBall.y, number: newBall.number});
+                    ballIndex++;
+                }
+            }
+        }
+
+        // Draw all balls
+        function drawBalls() {
+            balls.forEach(ball => ball.draw());
+        }
+
+        // Check for ball-to-ball collisions
+        function checkBallCollisions() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    const b1 = balls[i];
+                    const b2 = balls[j];
+                    const dx = b2.x - b1.x;
+                    const dy = b2.y - b1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < b1.radius + b2.radius) {
+                        ballHitSynth.triggerAttackRelease("C4", "8n");
+                        const angle = Math.atan2(dy, dx);
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+
+                        const v1RotatedX = b1.vx * cos + b1.vy * sin;
+                        const v1RotatedY = b1.vy * cos - b1.vx * sin;
+                        const v2RotatedX = b2.vx * cos + b2.vy * sin;
+                        const v2RotatedY = b2.vy * cos - b2.vx * sin;
+
+                        const v1FinalX = v2RotatedX;
+                        const v2FinalX = v1RotatedX;
+
+                        b1.vx = v1FinalX * cos - v1RotatedY * sin;
+                        b1.vy = v1RotatedY * cos + v1FinalX * sin;
+                        b2.vx = v2FinalX * cos - v2RotatedY * sin;
+                        b2.vy = v2RotatedY * cos + v2RotatedX * sin;
+
+                        const overlap = (b1.radius + b2.radius) - distance;
+                        b1.x -= (overlap / 2) * cos;
+                        b1.y -= (overlap / 2) * sin;
+                        b2.x += (overlap / 2) * cos;
+                        b2.y += (overlap / 2) * sin;
+                    }
+                }
+            }
+        }
+        
+        // Check for ball-to-cushion and ball-to-pocket collisions
+        function checkBoundaryCollisions() {
+            const pockets = getPockets();
+            let cueBallInPocket = false;
+            let ballsToPocket = [];
+
+            balls.forEach(ball => {
+                if (!ball.active) return;
+                
+                let isPocketed = false;
+                for (const pocket of pockets) {
+                    const dx = ball.x - pocket.x;
+                    const dy = ball.y - pocket.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < pocket.radius) {
+                        pocketSynth.triggerAttackRelease("C5", "8n");
+                        if (ball.type === 'cue') {
+                            cueBallInPocket = true;
+                        } else if (ball.type === 'harmful') {
+                            ballsToPocket.push(ball);
+                        }
+                        isPocketed = true;
+                        break; // Exit the pocket loop for this ball
+                    }
+                }
+                
+                if (!isPocketed) {
+                    // Prevent boundary collision check if ball is pocketed
+                    if (ball.x + ball.radius > canvas.width - 15 || ball.x - ball.radius < 15) {
+                        ball.vx *= -1;
+                        ball.vx *= 0.8;
+                    }
+                    if (ball.y + ball.radius > canvas.height - 15 || ball.y - ball.radius < 15) {
+                        ball.vy *= -1;
+                        ball.vy *= 0.8;
+                    }
+                    
+                    if (ball.x + ball.radius > canvas.width - 15) ball.x = canvas.width - 15 - ball.radius;
+                    if (ball.x - ball.radius < 15) ball.x = 15 + ball.radius;
+                    if (ball.y + ball.radius > canvas.height - 15) ball.y = canvas.height - 15 - ball.radius;
+                    if (ball.y - ball.radius < 15) ball.y = 15 + ball.radius;
+                }
+            });
+
+            ballsToPocket.forEach(ball => {
+                if (ball.type === 'harmful') {
+                    ball.active = false;
+                    pocketedBallsInTurn.push(ball.number);
+                }
+            });
+
+            if (cueBallInPocket) {
+                endGame("你把白球打進了洞裡，遊戲失敗。");
+            }
+        }
+
+
+        // Draw cue stick and shot arrow
+        function drawCueAndArrow() {
+            const dx = mouse.x - cueBall.x;
+            const dy = mouse.y - cueBall.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+            const power = Math.min(distance, MAX_POWER);
+            
+            ctx.save();
+            ctx.translate(cueBall.x, cueBall.y);
+            ctx.rotate(angle);
+            
+            const cueWidth = 8;
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(BALL_RADIUS + power, -cueWidth / 2, CUE_LENGTH, cueWidth);
+
+            ctx.fillStyle = '#f39c12';
+            ctx.fillRect(BALL_RADIUS + power, -cueWidth / 2, -power, cueWidth);
+            
+            ctx.restore();
+
+            // 繪製瞄準線
+            ctx.save();
+            ctx.translate(cueBall.x, cueBall.y);
+            ctx.rotate(angle + Math.PI);
+            
+            ctx.beginPath();
+            ctx.moveTo(BALL_RADIUS, 0);
+            ctx.lineTo(BALL_RADIUS + power, 0);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(BALL_RADIUS + power, 0);
+            ctx.lineTo(BALL_RADIUS + power - 10, -5);
+            ctx.lineTo(BALL_RADIUS + power - 10, 5);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Show player message
+        function showPlayerMessage() {
+            if (!isTwoPlayerMode) return;
+            playerTurnMessage.textContent = `玩家 ${currentPlayer} 的回合`;
+            playerTurnMessage.classList.add('show');
+            setTimeout(() => {
+                playerTurnMessage.classList.remove('show');
+            }, 1000);
+        }
+
+        // Check if all balls have stopped moving
+        function checkAllBallsStopped() {
+            if (balls.some(b => b.isMoving())) {
+                canTakeShot = false;
+                requestAnimationFrame(checkAllBallsStopped);
+            } else {
+                canTakeShot = true;
+                handleTurnEnd();
+                // Check win condition ONLY after all balls have stopped moving
+                const harmfulFactorsLeft = balls.filter(b => b.type === 'harmful' && b.active).length;
+                if (harmfulFactorsLeft === 0) {
+                    endGame("恭喜你！所有有害因素都清除了，你的泌尿系統很健康！");
+                }
+            }
+        }
+        
+        // Update timer display
+        function updateTimerDisplay() {
+            const elapsedTime = Date.now() - gameStartTime;
+            const remainingTime = Math.max(0, gameDuration - elapsedTime);
+            const minutes = Math.floor(remainingTime / 60000);
+            const seconds = Math.floor((remainingTime % 60000) / 1000);
+            
+            const displayMinutes = String(minutes).padStart(2, '0');
+            const displaySeconds = String(seconds).padStart(2, '0');
+            
+            timerDisplay.textContent = `${displayMinutes}:${displaySeconds}`;
+
+            if (remainingTime <= 0) {
+                endGame("時間到了，遊戲失敗。");
+            }
+        }
+
+        // Handle the logic at the end of a turn
+        function handleTurnEnd() {
+            let correctBallPocketed = false;
+            let otherBallsPocketed = false;
+
+            // Check what was pocketed
+            pocketedBallsInTurn.forEach(num => {
+                if (num === targetBallNumber) {
+                    correctBallPocketed = true;
+                } else {
+                    otherBallsPocketed = true;
+                }
+            });
+
+            // Reposition any incorrectly pocketed balls
+            const incorrectlyPocketed = pocketedBallsInTurn.filter(num => num !== targetBallNumber);
+            incorrectlyPocketed.forEach(num => {
+                const ballToReposition = balls.find(b => b.number === num);
+                if (ballToReposition) {
+                    ballToReposition.active = true;
+                    const originalPos = ballPositions.find(pos => pos.number === num);
+                    if (originalPos) {
+                        ballToReposition.x = originalPos.x;
+                        ballToReposition.y = originalPos.y;
+                        ballToReposition.vx = 0;
+                        ballToReposition.vy = 0;
+                    }
+                }
+            });
+
+            if (correctBallPocketed) {
+                targetBallNumber++;
+            }
+
+            if (isTwoPlayerMode) {
+                // If a correct ball was pocketed, the current player takes another turn.
+                // Otherwise, the turn passes to the next player.
+                if (!correctBallPocketed) {
+                    currentPlayer = currentPlayer === 1 ? 2 : 1;
+                    showPlayerMessage();
+                }
+            }
+
+            pocketedBallsInTurn = []; // Clear the pocketed balls for the next turn
+        }
+
+
+        // Main game loop
+        function gameLoop() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawTable();
+
+            balls.forEach(ball => ball.update());
+            checkBallCollisions();
+            checkBoundaryCollisions();
+
+            drawBalls();
+            
+            if (canTakeShot) {
+                drawCueAndArrow();
+            }
+
+            const nextTarget = balls.find(b => b.number === targetBallNumber);
+            scoreDisplay.textContent = `下一個目標: ${nextTarget ? nextTarget.name + ' (' + nextTarget.number + '號)' : '無'}`;
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Start game function
+        function startNewGame() {
+            gameActive = true;
+            gameStatusOverlay.classList.add('hidden');
+            targetBallNumber = 1;
+            pocketedBallsInTurn = [];
+            canTakeShot = true;
+            
+            isTwoPlayerMode = (currentGameMode === 'two');
+            if (isTwoPlayerMode) {
+                // Fix: Always start with Player 1
+                currentPlayer = 1;
+                showPlayerMessage();
+            }
+            
+            resetBalls();
+            resizeCanvas();
+            animationFrameId = requestAnimationFrame(gameLoop);
+
+            // Start timer
+            gameStartTime = Date.now();
+            updateTimerDisplay();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimerDisplay, 1000);
+        }
+        
+        // End game function
+        function endGame(message) {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            clearInterval(timerInterval);
+            gameStatusOverlay.classList.remove('hidden');
+            rulesScreen.classList.add('hidden');
+            modeScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+            endMessage.textContent = message;
+        }
+
+        // Mouse and Touch Event Listeners
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let x, y;
+            if (e.type.startsWith('touch')) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            return { x, y };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameActive || !canTakeShot) return;
+            const pos = getMousePos(e);
+            mouse.down = true;
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+            mouse.initialX = pos.x;
+            mouse.initialY = pos.y;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!gameActive || !mouse.down) return;
+            const pos = getMousePos(e);
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (mouse.down && canTakeShot) {
+                const dx = mouse.initialX - mouse.x;
+                const dy = mouse.initialY - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                cueBall.vx = dx / 5;
+                cueBall.vy = dy / 5;
+                mouse.down = false;
+                checkAllBallsStopped();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+             if (!gameActive || !canTakeShot) return;
+             e.preventDefault();
+             const pos = getMousePos(e);
+             mouse.down = true;
+             mouse.x = pos.x;
+             mouse.y = pos.y;
+             mouse.initialX = pos.x;
+             mouse.initialY = pos.y;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!gameActive || !mouse.down) return;
+            const pos = getMousePos(e);
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (mouse.down && canTakeShot) {
+                e.preventDefault();
+                const dx = mouse.initialX - mouse.x;
+                const dy = mouse.initialY - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                cueBall.vx = dx / 5;
+                cueBall.vy = dy / 5;
+                mouse.down = false;
+                checkAllBallsStopped();
+            }
+        });
+
+        nextButton.addEventListener('click', () => {
+            rulesScreen.classList.add('hidden');
+            modeScreen.classList.remove('hidden');
+        });
+
+        singlePlayerButton.addEventListener('click', () => {
+            Tone.start();
+            currentGameMode = 'single';
+            startNewGame();
+        });
+
+        twoPlayerButton.addEventListener('click', () => {
+            Tone.start();
+            currentGameMode = 'two';
+            startNewGame();
+        });
+        
+        restartButton.addEventListener('click', () => {
+             endScreen.classList.add('hidden');
+             modeScreen.classList.remove('hidden');
+             gameStatusOverlay.classList.remove('hidden');
+        });
+
+        window.onload = () => {
+            resizeCanvas();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
+
